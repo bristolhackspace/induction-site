@@ -7,6 +7,6 @@ setup(
         "bristolhackspace": ["*"],
     },
     install_requires=[
-        'bristolhackspace.flask_utils @ git+ssh://git@github.com/bristolhackspace/flask-utils.git@main'
+        'bristolhackspace.flask_utils @ git+https://github.com/bristolhackspace/flask-utils.git@main'
     ],
 )
