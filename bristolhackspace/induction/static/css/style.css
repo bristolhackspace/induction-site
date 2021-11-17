@@ -1,0 +1,8 @@
+.answers {
+    list-style: none;
+    padding: 0;
+}
+
+.answers li input {
+    margin: 0 1rem;
+}
