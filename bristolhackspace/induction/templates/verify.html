@@ -1,0 +1,21 @@
+{% extends "nav_base.html" %}
+
+{% block title %}Questionnaire{% endblock %}
+
+{% block content %}
+
+{% if all_correct %}
+<p>Congratulations. You have now been added to the {{ questionaire_name }} group.</p>
+{% else %}
+<p>
+    Unfortunately you got a few questions wrong. See below for the answers and click
+    <a href="{{ url_for('index', questionaire_name=questionaire_name) }}">here</a> to try again.
+</p>
+{% for q_id in wrong_answers %}
+{% set question = questionnaire.questions[q_id] %}
+<h3>{{ question.text }}</h3>
+<p>{{ question.answer_hint }}</p>
+{% endfor %}
+{% endif %}
+
+{% endblock %}

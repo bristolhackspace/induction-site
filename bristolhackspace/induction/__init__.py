@@ -7,6 +7,7 @@ import attr
 import re
 import random
 import json
+from requests.models import HTTPError
 
 app = Flask(__name__)
 app.config.from_envvar('INDUCTIONSITE_SETTINGS')
@@ -43,12 +44,14 @@ class Questionnaire:
 class Question:
     text = attr.ib()
     answers = attr.ib()
+    answer_hint = attr.ib()
 
     @classmethod
     def from_json(cls, json):
         text = json["text"]
         answers = [Answer.from_json(a_json) for a_json in json["answers"]]
-        return cls(text, answers)
+        answer_hint = json["answer_hint"]
+        return cls(text, answers, answer_hint)
 
 
 @attr.s
@@ -87,28 +90,31 @@ def load_questionnaire(name):
 def add_logged_in_user_to_group(group_name):
     group = dc_client.group(group_name)
     group_id = group["group"]["id"]
-    dc_client.add_group_member(group_id, session["username"])
+    try:
+        dc_client.add_group_member(group_id, session["username"])
+    except HTTPError as ex:
+        if ex.response.status_code != 422:
+            raise
 
 
-@app.route("/<questionaire_name>", methods=["GET", "POST"])
+def is_already_member(group_name):
+    user = dc_client.user_by_id(session["member_id"])
+    group = dc_client.group(group_name)
+    group_id = group["group"]["id"]
+
+    for group in user["groups"]:
+        if group["id"] == group_id:
+            return True
+    return False
+
+
+@app.route("/<questionaire_name>")
 @sso.requires_login
 def index(questionaire_name):
     questionnaire = load_questionnaire(questionaire_name)
-
-    if "submitted" in request.form:
-        response = parse_response(request.form)
-        question_order = response.keys()
-        validity = questionnaire.validate_answers(response)
-        all_correct = False not in validity
-        if all_correct:
-            add_logged_in_user_to_group(f"{questionaire_name}_inducted")
-    else:
-        response = {}
-        question_order = random.sample(
-            range(len(questionnaire.questions)), k=len(questionnaire.questions)
-        )
-        validity = [None] * len(questionnaire.questions)
-        pass
+    question_order = random.sample(
+        range(len(questionnaire.questions)), k=len(questionnaire.questions)
+    )
 
     answer_order = {}
     for i, question in enumerate(questionnaire.questions):
@@ -121,6 +127,29 @@ def index(questionaire_name):
         questionnaire=questionnaire,
         question_order=question_order,
         answer_order=answer_order,
-        validity=validity,
-        response=response,
     )
+
+
+@app.route("/<questionaire_name>/validate", methods=["POST"])
+def validate(questionaire_name):
+    questionnaire = load_questionnaire(questionaire_name)
+    response = parse_response(request.form)
+    validity = questionnaire.validate_answers(response)
+    all_correct = False not in validity
+    if all_correct:
+        add_logged_in_user_to_group(f"{questionaire_name}_inducted")
+
+    wrong_answers = []
+    for i, valid in enumerate(validity):
+        if not valid:
+            wrong_answers.append(i)
+
+    return render_template(
+        "verify.html",
+        questionaire_name=questionaire_name,
+        all_correct=all_correct,
+        wrong_answers=wrong_answers,
+        questionnaire=questionnaire
+    )
+
+    

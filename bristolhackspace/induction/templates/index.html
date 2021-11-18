@@ -4,7 +4,7 @@
 
 {% block content %}
 
-<form action="{{ url_for('index', questionaire_name=questionaire_name) }}" method="post">
+<form action="{{ url_for('validate', questionaire_name=questionaire_name) }}" method="post">
     {% for q_id in question_order %}
     {% set question = questionnaire.questions[q_id] %}
 
@@ -15,13 +15,6 @@
         <li>
             <input type="radio" id="a_{{ q_id }}_{{ a_id }}" name="question_{{ q_id }}" value="{{ a_id }}">
             <label for="a_{{ q_id }}_{{ a_id }}">{{ question.answers[a_id].text }}</label>
-            {% if validity[q_id] == True and response[q_id] == a_id %}
-            <span>(Correct!)</span>
-            {% elif validity[q_id] == False and response[q_id] == a_id %}
-            <span>(Incorrect!)</span>
-            {% elif validity[q_id] == False and question.answers[a_id].correct == True %}
-            <span>(This was the correct answer.)</span>
-            {% endif %}
         </li>
         {% endfor %}
     </ul>

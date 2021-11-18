@@ -13,7 +13,8 @@
                 {
                     "text": "10"
                 }
-            ]
+            ],
+            "answer_hint": "The answer is 20."
         }
     ]
 }
