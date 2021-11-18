@@ -1,14 +1,18 @@
 from typing import OrderedDict
-from flask import Flask, render_template, request, abort
+from flask import Flask, render_template, request, abort, session
 from bristolhackspace.theme import theme_blueprint
+from bristolhackspace.sso import BaseDiscourseSSO
+from bristolhackspace.discourse import DiscourseClient
 import attr
 import re
 import random
 import json
 
 app = Flask(__name__)
+app.config.from_envvar('INDUCTIONSITE_SETTINGS')
 app.register_blueprint(theme_blueprint, url_prefix="/theme")
-
+sso = BaseDiscourseSSO(app.config["DISCOURSE_CONNECT_PROVIDER_SECRET"], app.config["DISCOURSE_URL"])
+dc_client = DiscourseClient(app.config["DISCOURSE_URL"], app.config["DISCOURSE_API_USER"], app.config["DISCOURSE_API_KEY"])
 QUESTION_REGEX = re.compile(r"^question_(\d+)$")
 
 
@@ -80,7 +84,14 @@ def load_questionnaire(name):
         abort(404) 
 
 
+def add_logged_in_user_to_group(group_name):
+    group = dc_client.group(group_name)
+    group_id = group["group"]["id"]
+    dc_client.add_group_member(group_id, session["username"])
+
+
 @app.route("/<questionaire_name>", methods=["GET", "POST"])
+@sso.requires_login
 def index(questionaire_name):
     questionnaire = load_questionnaire(questionaire_name)
 
@@ -89,6 +100,8 @@ def index(questionaire_name):
         question_order = response.keys()
         validity = questionnaire.validate_answers(response)
         all_correct = False not in validity
+        if all_correct:
+            add_logged_in_user_to_group(f"{questionaire_name}_inducted")
     else:
         response = {}
         question_order = random.sample(
