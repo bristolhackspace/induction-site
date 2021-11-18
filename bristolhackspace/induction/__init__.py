@@ -1,9 +1,10 @@
 from typing import OrderedDict
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, abort
 from bristolhackspace.theme import theme_blueprint
 import attr
 import re
 import random
+import json
 
 app = Flask(__name__)
 app.register_blueprint(theme_blueprint, url_prefix="/theme")
@@ -28,11 +29,22 @@ class Questionnaire:
 
         return correct
 
+    @classmethod
+    def from_json(cls, json):
+        questions = [Question.from_json(q_json) for q_json in json["questions"]]
+        return cls(questions)
+
 
 @attr.s
 class Question:
     text = attr.ib()
     answers = attr.ib()
+
+    @classmethod
+    def from_json(cls, json):
+        text = json["text"]
+        answers = [Answer.from_json(a_json) for a_json in json["answers"]]
+        return cls(text, answers)
 
 
 @attr.s
@@ -40,19 +52,11 @@ class Answer:
     text = attr.ib()
     correct = attr.ib(default=False)
 
-
-questionnaire = Questionnaire(
-    questions=[
-        Question(
-            "What should you not be?",
-            answers=[
-                Answer("On fire", correct=True),
-                Answer("Cool"),
-                Answer("Nerdy"),
-            ],
-        )
-    ]
-)
+    @classmethod
+    def from_json(cls, json):
+        text = json["text"]
+        correct = bool(json.get("correct", False))
+        return cls(text, correct)
 
 
 def parse_response(form):
@@ -67,8 +71,19 @@ def parse_response(form):
     return answers
 
 
-@app.route("/", methods=["GET", "POST"])
-def index():
+def load_questionnaire(name):
+    try:
+        with app.open_resource(f"questions/{name}.json", "r") as fh:
+            data = json.load(fh)
+            return Questionnaire.from_json(data)
+    except FileNotFoundError:
+        abort(404) 
+
+
+@app.route("/<questionaire_name>", methods=["GET", "POST"])
+def index(questionaire_name):
+    questionnaire = load_questionnaire(questionaire_name)
+
     if "submitted" in request.form:
         response = parse_response(request.form)
         question_order = response.keys()
@@ -89,6 +104,7 @@ def index():
 
     return render_template(
         "index.html",
+        questionaire_name=questionaire_name,
         questionnaire=questionnaire,
         question_order=question_order,
         answer_order=answer_order,

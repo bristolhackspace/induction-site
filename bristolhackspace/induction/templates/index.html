@@ -4,7 +4,7 @@
 
 {% block content %}
 
-<form action="{{ url_for('index') }}" method="post">
+<form action="{{ url_for('index', questionaire_name=questionaire_name) }}" method="post">
     {% for q_id in question_order %}
     {% set question = questionnaire.questions[q_id] %}
 
